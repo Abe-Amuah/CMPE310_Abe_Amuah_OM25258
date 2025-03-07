@@ -1,0 +1,106 @@
+     1                                  section .data
+     2 00000000 48616D6D696E672044-         result_prompt db "Hamming Distance: ", 0
+     2 00000009 697374616E63653A20-
+     2 00000012 00                 
+     3 00000013 0A00                        newline db 0xA, 0
+     4 00000015 666F6F00                    foo db "foo", 0   ; Hardcoded string "foo"
+     5 00000019 62617200                    bar db "bar", 0   ; Hardcoded string "bar"
+     6                                  
+     7                                  section .bss
+     8 00000000 ????????                    hamming_distance resd 1  ; Reserve 4 bytes for Hamming distance
+     9 00000004 <res Ah>                    distance_str resb 10     ; Buffer for the Hamming distance string
+    10                                  
+    11                                  global main
+    12                                  section .text
+    13                                  main:
+    14                                      ; Initialize Hamming distance to 0
+    15 00000000 C70425[00000000]00-         mov dword [hamming_distance], 0
+    15 00000008 000000             
+    16                                  
+    17                                      ; Initialize the index for string comparison
+    18 0000000B 31C9                        xor ecx, ecx        ; Set ECX to 0 (index for string comparison)
+    19                                  
+    20                                  compare_loop:
+    21                                      ; Load the current byte of both strings
+    22 0000000D 678A81[15000000]            mov al, [foo + ecx]
+    23 00000014 678A99[19000000]            mov bl, [bar + ecx]
+    24                                  
+    25                                      ; If both strings are null-terminated, exit the loop
+    26 0000001B 3C00                        cmp al, 0
+    27 0000001D 7421                        je done
+    28 0000001F 80FB00                      cmp bl, 0
+    29 00000022 741C                        je done
+    30                                  
+    31                                      ; Calculate the difference (XOR) between the characters (bitwise comparison)
+    32 00000024 30D8                        xor al, bl          ; XOR the two characters to get the differing bits
+    33                                  
+    34                                      ; Count the number of 1 bits in the XOR result (Hamming distance for this byte)
+    35 00000026 88C4                        mov ah, al          ; Copy the result into AH for bit counting
+    36 00000028 31D2                        xor edx, edx        ; Clear EDX (Hamming distance accumulator)
+    37                                  count_bits:
+    38 0000002A F6C401                      test ah, 1          ; Test the least significant bit (LSB)
+    39 0000002D 7402                        jz no_bit           ; If the bit is 0, jump to no_bit
+    40 0000002F FFC2                        inc edx             ; If the bit is 1, increment the counter
+    41                                  no_bit:
+    42 00000031 D0EC                        shr ah, 1           ; Shift the bits to the right
+    43 00000033 75F5                        jnz count_bits      ; Repeat for all bits until AH is 0
+    44                                  
+    45                                      ; Add the Hamming distance for this byte to the total
+    46 00000035 011425[00000000]            add [hamming_distance], edx
+    47                                  
+    48                                      ; Move to the next byte in the strings
+    49 0000003C FFC1                        inc ecx
+    50 0000003E EBCD                        jmp compare_loop
+    51                                  
+    52                                  done:
+    53                                      ; Print the result prompt: "Hamming Distance: "
+    54 00000040 B801000000                  mov eax, 1          ; syscall number for write
+    55 00000045 BF01000000                  mov edi, 1          ; file descriptor 1 (stdout)
+    56 0000004A BE[00000000]                mov esi, result_prompt ; pointer to the result prompt
+    57 0000004F BA12000000                  mov edx, 18         ; length of result prompt
+    58 00000054 0F05                        syscall
+    59                                  
+    60                                      ; Print the Hamming distance as a number (converting it to string)
+    61 00000056 8B0425[00000000]            mov eax, [hamming_distance] ; Load the Hamming distance into eax
+    62 0000005D B90A000000                  mov ecx, 10         ; Base 10 for number conversion
+    63 00000062 BB[04000000]                mov ebx, distance_str   ; Buffer for converted digits
+    64 00000067 83C30A                      add ebx, 10         ; Move the buffer pointer to the end
+    65 0000006A 67C60300                    mov byte [ebx], 0   ; Null-terminate the buffer
+    66                                  
+    67                                      ; Convert to string (reverse order)
+    68                                  convert_to_str:
+    69 0000006E 31D2                        xor edx, edx        ; Clear edx (remainder)
+    70 00000070 F7F1                        div ecx             ; Divide eax by 10, quotient in eax, remainder in edx
+    71 00000072 FFCB                        dec ebx             ; Move the pointer back for the next character
+    72 00000074 80C230                      add dl, '0'         ; Convert remainder to ASCII character
+    73 00000077 678813                      mov [ebx], dl       ; Store character in buffer
+    74 0000007A 85C0                        test eax, eax       ; Check if quotient is zero
+    75 0000007C 75F0                        jnz convert_to_str  ; If not, continue dividing
+    76                                  
+    77                                      ; Move the buffer pointer back to the start of the string
+    78 0000007E 89DE                        mov esi, ebx        ; Set esi to point to the beginning of the string
+    79                                  
+    80                                      ; Print the Hamming distance string from the correct position
+    81                                  print_loop:
+    82 00000080 678A06                      mov al, [esi]       ; Load character
+    83 00000083 84C0                        test al, al         ; Check if it is null terminator
+    84 00000085 7415                        jz done_printing    ; If null terminator, stop printing
+    85 00000087 B801000000                  mov eax, 1          ; syscall number for write
+    86 0000008C BF01000000                  mov edi, 1          ; file descriptor 1 (stdout)
+    87 00000091 BA01000000                  mov edx, 1          ; length of character
+    88 00000096 0F05                        syscall
+    89 00000098 FFC6                        inc esi             ; Move to the next character
+    90 0000009A EBE4                        jmp print_loop
+    91                                  
+    92                                  done_printing:
+    93                                      ; Print newline
+    94 0000009C B801000000                  mov eax, 1          ; syscall number for write
+    95 000000A1 BF01000000                  mov edi, 1          ; file descriptor 1 (stdout)
+    96 000000A6 BE[13000000]                mov esi, newline    ; pointer to the newline character
+    97 000000AB BA01000000                  mov edx, 1          ; length of newline
+    98 000000B0 0F05                        syscall
+    99                                  
+   100                                      ; Exit the program
+   101 000000B2 B83C000000                  mov eax, 60         ; syscall number for exit
+   102 000000B7 31FF                        xor edi, edi        ; status 0
+   103 000000B9 0F05                        syscall
